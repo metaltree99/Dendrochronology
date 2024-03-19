@@ -4,7 +4,7 @@
 #====================================================================
 #Script to reformat Tucson format dendrochronology files (.rwl), to have them at 1 line per width.
 #====================================================================
-version=20240105
+version=20240319
 test=0 #1 = yes; 0 = no
 #----------------------------------------------------------------
 #Usage
@@ -111,7 +111,9 @@ test=0 #1 = yes; 0 = no
 #20240105
 #	Now calculates for each sample: first/last year, years/rings count
 #	Corrected logging
-
+#20240319
+#	Now the outfile name is made of [original_filename]_formatted_[timestamp].txt
+#	A list of unique sample names is now created: [original_filename]_unique_sample_names_[timestamp].txt
 
 #----------------------------------------------------------------
 #Variables definition
@@ -132,6 +134,10 @@ mkdir ./rwl_outfiles_${ts}
 #Copy infile to that folder
 #-----------------------------------------------------------------
 cp $1  ./rwl_outfiles_${ts}
+
+#Outfile name
+outfile_name="${1}_formatted_${ts}.txt"
+
 
 
 #Start of logging block
@@ -182,7 +188,8 @@ cut -f3 -d $'\t' /dev/shm/rwl_split_sn_year_widths_${ts}.txt|perl -pe 's/^ +//g'
 #Paste together the sample name, year and widths, all separated by tabs
 paste /dev/shm/rwl_sn_${ts}.txt /dev/shm/rwl_year_${ts}.txt /dev/shm/rwl_widths_${ts}.txt > /dev/shm/rwl_separated_sample_and_year_${ts}.txt
 
-
+#Create a list of unique sample names
+sort -u /dev/shm/rwl_sn_${ts}.txt > /dev/shm/${1}_unique_sample_names_${ts}.txt
 
 #If in test mode, do only the first 3 samples
 if [ $test -eq 1 ]
@@ -216,8 +223,8 @@ echo
 
 #Count the number of distinct samples
 #----------------------------------------------
-samples_count=$(cut -f1 -d $'\t' /dev/shm/rwl_one_line_per_width_${ts}.txt|sort -u|wc -l)
-
+#Line before 2024-03-19: samples_count=$(cut -f1 -d $'\t' /dev/shm/rwl_one_line_per_width_${ts}.txt|sort -u|wc -l)
+samples_count=$(cat /dev/shm/${1}_unique_sample_names_${ts}.txt|wc -l)
 
 #Count the different markers
 #---------------------------------
@@ -357,16 +364,16 @@ awk -F "\t" -v eosm=${eos_marker} '{if ($3 != eosm) print }' /dev/shm/rwl_one_li
 if [[ ${eos_marker} == "999" ]]
 then
 	echo "Converting 0.01 to 0.001 format"
-	awk -F "\t" '{print $1"\t"$2"\t"$3*10}' /dev/shm/rwl_one_line_per_width_0s_no_eos_${ts}.txt > /dev/shm/rwl_final_${ts}.txt
+	awk -F "\t" '{print $1"\t"$2"\t"$3*10}' /dev/shm/rwl_one_line_per_width_0s_no_eos_${ts}.txt > /dev/shm/${outfile_name}
 else
-	cp /dev/shm/rwl_one_line_per_width_0s_no_eos_${ts}.txt /dev/shm/rwl_final_${ts}.txt
+	cp /dev/shm/rwl_one_line_per_width_0s_no_eos_${ts}.txt /dev/shm/${outfile_name}
 fi
 
 
 
 #[NEW 20240105]: Calculates first/last ring year, rings/years count
 #--------------------------------------
-join -t $'\t' -1 1 -2 1  <( cut -f1,2 -d $'\t' /dev/shm/rwl_final_${ts}.txt |sort -k1,1 -k2,2n |sort -k1,1 -u) <(cut -f1,2 -d $'\t' /dev/shm/rwl_final_${ts}.txt |sort -k1,1 -k2,2nr |sort -k1,1 -u)| join -t $'\t' -1 1 -2 1 - <(cut -f1 -d $'\t' /dev/shm/rwl_final_${ts}.txt |sort|uniq -c|perl -pe 's/^ +(\d+) (\S+)/\2\t\1/g')|awk -F "\t" '{print $0"\t"$3-$2+1}'|awk -F "\t" '{if ($4 != $5) print $0"\tERR"; else print $0"\t"}' > /dev/shm/rwl_sn_fyear_lyear_rcount_ycount_err_${ts}.txt
+join -t $'\t' -1 1 -2 1  <( cut -f1,2 -d $'\t' /dev/shm/${outfile_name} |sort -k1,1 -k2,2n |sort -k1,1 -u) <(cut -f1,2 -d $'\t' /dev/shm/${outfile_name} |sort -k1,1 -k2,2nr |sort -k1,1 -u)| join -t $'\t' -1 1 -2 1 - <(cut -f1 -d $'\t' /dev/shm/${outfile_name} |sort|uniq -c|perl -pe 's/^ +(\d+) (\S+)/\2\t\1/g')|awk -F "\t" '{print $0"\t"$3-$2+1}'|awk -F "\t" '{if ($4 != $5) print $0"\tERR"; else print $0"\t"}' > /dev/shm/rwl_sn_fyear_lyear_rcount_ycount_err_${ts}.txt
 
 
 
@@ -384,9 +391,9 @@ printf "done.\n"
 echo
 echo "Script completed!"
 
-echo "The final file is rwl_outfiles_${ts}/rwl_final_${ts}.txt:"
-head rwl_outfiles_${ts}/rwl_final_${ts}.txt|perl -pe 's/^/\t/g'
-printf "\t(...$(cat rwl_outfiles_${ts}/rwl_final_${ts}.txt|wc -l))\n"
+echo "The final file is rwl_outfiles_${ts}/${outfile_name}:"
+head rwl_outfiles_${ts}/${outfile_name}|perl -pe 's/^/\t/g'
+printf "\t(...$(cat rwl_outfiles_${ts}/${outfile_name}|wc -l))\n"
 echo
 
 echo "The file rwl_outfiles_${ts}/rwl_sn_fyear_lyear_rcount_ycount_err_${ts}.txt gives the first/last ring years:"
