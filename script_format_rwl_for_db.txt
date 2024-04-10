@@ -12,8 +12,7 @@ test=0 #1 = yes; 0 = no
 #script_format_rwl_for_db.txt infile.rwl
 #	infile.rwl: the original .rwl file
 # A folder named rwl_outfiles_202xxxxxxxxxxx will be created in the current folder and will contain all the temporary as well as the final files.
-# The final file is named: rwl_final_202xxxxxxxxxxx.txt
-
+# The final file is named: [original_filename]_formatted_[timestamp].txt
 #----------------------------------------------------------------
 #Quick notes on Tucson format dendrochronology files:
 #----------------------------------------------------------------
@@ -26,9 +25,9 @@ test=0 #1 = yes; 0 = no
 #	b. the year of the first ring of that row
 #		- Always on characters positions 9 to 12
 #	c. a series of ring widths (10 or less).
-#Ring widths are always expressed in integers, each width representing either 0.01 or 0.001 mm.
+#Ring widths are always expressed in integers, each one representing either 0.01 or 0.001 mm scales.
 #For each sample, a series of widths always ends with an end of series (EOS) marker, either 999 (0.01 mm) or -9999 (0.001 mm).
-#Missing value are written as -999 (0.01 mm) or 0 (-9999).
+#Missing value are written as -999 (0.01 mm) or 0 (0.001 mm).
 
 #Example 1: acadiE60A.rwl
 #	100271861984  2233  2839  2518  2510  3006  2605
@@ -60,19 +59,19 @@ test=0 #1 = yes; 0 = no
 #	       2                                                           1978 2022
 #	       3 
 #		#### CDendro=9.3.1  June 5 2018; 
-#		#### licensedTo=Boilard, catherine.boilard@canada.ca; 
+#		#### licensedTo=Ernest, laurie.ernest@workinglate.org; 
 #	6822    1981   288   322   296   558   442   435   309   369   362
 #	6822    1990   512   159   232   241   141   173   153    91   104   120
 #	6822    2000   128   149   107   125   145   117   104   117   126   136
 #	6822    2010    59    78    50    59    60    92    75    78    78    70
 #	6822    2020    59    62    41   999
 #	6822    #### Written=2023-01-24 11:25:40; 
-#	6822    #### LicencedTo=martin girardin, martin.girardin@rncan.gc.ca; 
+#	6822    #### LicencedTo=Edward Scissorhands, edward.scissorhands@shortintime.com; 
 #	6823    1988   231   237
 #	(...)
 #Notes: 
 #	- this file is in 0.01 mm widths (999 EOS marker)
-#	- there are a lot of comments and a header, which need to be removed.
+#	- there are a lot of comments and a header, which all need to be removed.
 
 #Output from the script for example 2 (in 0.001 format):
 #	6822	1981	2880
@@ -92,17 +91,17 @@ test=0 #1 = yes; 0 = no
 #----------------------------------------------------------------
 #The script does the following:
 #----------------------------------------------------------------
-#	1. Cleans the file to remove the header, comments, and trailing spaces. Also replace spaces with tabs
-#	2. Separates the sample name and the year
-#	3. Splits each line into 1 row per year and width
-#	4. Checks if the file is in 0.01 mm (999 end of series marker) or 0.001 mm (-9999 en of series marker) widths format.
+#	1. Cleans the file to remove the header, comments, and trailing spaces. Also replaces spaces with tabs;
+#	2. Separates the sample name and the year;
+#	3. Splits each line into 1 row per year and width;
+#	4. Checks if the file is in 0.01 mm (999 end of series marker) or 0.001 mm (-9999 en of series marker) widths format;
 #	5. Various checks:
 #		a. are there series without end of series markers?
 #		b. are there files with both (999 and -9999) end of series markers?
 #		c. are there files with missing values markers of the wrong type ?
-#	6. Replace all missing values with 0
-#	7. Remove EOS markers
-#	8. Convert 0.01 mm files to 0.001 mm.
+#	6. Replaces all missing values with 0;
+#	7. Removes EOS markers;
+#	8. Converts 0.01 mm files to 0.001 mm;
 
 
 #----------------------------------------------------------------
@@ -370,12 +369,9 @@ else
 fi
 
 
-
-#[NEW 20240105]: Calculates first/last ring year, rings/years count
+#[NEW 20240105]: Calculate first/last ring year, rings/years count
 #--------------------------------------
 join -t $'\t' -1 1 -2 1  <( cut -f1,2 -d $'\t' /dev/shm/${outfile_name} |sort -k1,1 -k2,2n |sort -k1,1 -u) <(cut -f1,2 -d $'\t' /dev/shm/${outfile_name} |sort -k1,1 -k2,2nr |sort -k1,1 -u)| join -t $'\t' -1 1 -2 1 - <(cut -f1 -d $'\t' /dev/shm/${outfile_name} |sort|uniq -c|perl -pe 's/^ +(\d+) (\S+)/\2\t\1/g')|awk -F "\t" '{print $0"\t"$3-$2+1}'|awk -F "\t" '{if ($4 != $5) print $0"\tERR"; else print $0"\t"}' > /dev/shm/rwl_sn_fyear_lyear_rcount_ycount_err_${ts}.txt
-
-
 
 
 #Move temporary files from RAM to current folder
@@ -410,12 +406,4 @@ printf "\tColumn 6: If there is a difference between columns 4 and 5, ERR will a
 #End of logging block
 } 2>&1|tee rwl_outfiles_${ts}/script_log.txt
 
-
-
 exit
-
-
-
-
-
-
